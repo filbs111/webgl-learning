@@ -252,6 +252,8 @@ function animate(tickTime) {
 
       rTri += (90 * elapsed) / 1000.0;
       rSquare += (75 * elapsed) / 1000.0;
+	  rTri %= 360;
+	  rSquare %= 360;
     }
     lastTime = timeNow;
 }
