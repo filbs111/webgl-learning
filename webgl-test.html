@@ -12,11 +12,13 @@ Testing WebGL
 
   varying vec4 vColor;
   varying vec2 vTextureCoord;
+  varying vec3 vLightWeighting;
   
   uniform sampler2D uSampler;
   
   void main(void) {
-    gl_FragColor = vColor + texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));
+	vec4 textureColor = vColor + texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));
+    gl_FragColor = vec4( textureColor.rgb*vLightWeighting , textureColor.a);
   }
 </script>
 
@@ -28,17 +30,29 @@ Testing WebGL
   
   uniform mat4 uMVMatrix;
   uniform mat4 uPMatrix;
+  uniform mat3 uNMatrix;
   uniform vec3 uAmbient;
   uniform bool uLighting;
+  uniform vec3 uLightingDir;
+  uniform vec3 uDirectionalColor;
   
   varying vec4 vColor;
   varying vec2 vTextureCoord;
+  varying vec3 vLightWeighting;
   
   void main(void) {
     gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
-	vColor = aVertexColor * vec4(uAmbient //+ aVertexNormal*vec3(0.0,0.0,0.0)
-	, 1.0);
+	vColor = aVertexColor;
 	vTextureCoord = aTextureCoord;
+	
+	if (!uLighting) {
+      vLightWeighting = vec3(1.0, 1.0, 1.0);	//fully lit
+    } else {
+      vec3 transformedNormal = uNMatrix * aVertexNormal;
+      float directionalLightWeighting = max(dot(transformedNormal, uLightingDir), 0.0);
+      vLightWeighting = uAmbient + uDirectionalColor * directionalLightWeighting;
+    }
+	
   }
 </script>
 
@@ -128,6 +142,13 @@ function initShaders(){
 	
 	shaderProgram.useLightingUniform = gl.getUniformLocation(shaderProgram, "uLighting");
 	shaderProgram.ambientColorUniform = gl.getUniformLocation(shaderProgram, "uAmbient");
+	
+	shaderProgram.lightingDirectionUniform = gl.getUniformLocation(shaderProgram, "uLightingDir");
+	
+	shaderProgram.directionalColorUniform = gl.getUniformLocation(shaderProgram, "uDirectionalColor");
+	
+	shaderProgram.nMatrixUniform = gl.getUniformLocation(shaderProgram, "uNMatrix");
+	
 }
 
 var neheTextures = Array();
@@ -143,8 +164,8 @@ function initTexture() {
     neheTextureImage.onload = function() {
       handleLoadedTexture(neheTextures)
     }
-    neheTextureImage.src = "img/nehe.gif";
-	//neheTextureImage.src = "img/crate.gif";
+    //neheTextureImage.src = "img/nehe.gif";
+	neheTextureImage.src = "img/crate.gif";
 }
 function handleLoadedTexture(textures) {
 	gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
@@ -190,6 +211,11 @@ function mvPopMatrix() {
 function setMatrixUniforms() {
     gl.uniformMatrix4fv(shaderProgram.pMatrixUniform, false, pMatrix);
     gl.uniformMatrix4fv(shaderProgram.mvMatrixUniform, false, mvMatrix);
+	
+	var normalMatrix = mat3.create();
+    mat4.toInverseMat3(mvMatrix, normalMatrix);
+    mat3.transpose(normalMatrix);
+    gl.uniformMatrix3fv(shaderProgram.nMatrixUniform, false, normalMatrix);
 }
   
 
@@ -364,6 +390,24 @@ function drawScene(){
         parseFloat(document.getElementById("ambientG").value),
         parseFloat(document.getElementById("ambientB").value)
       );
+	  
+	  var lightingDirection = [
+        parseFloat(document.getElementById("lightDirectionX").value),
+        parseFloat(document.getElementById("lightDirectionY").value),
+        parseFloat(document.getElementById("lightDirectionZ").value)
+      ];
+	  var adjustedLD = vec3.create();
+      vec3.normalize(lightingDirection, adjustedLD);
+      vec3.scale(adjustedLD, -1);
+      gl.uniform3fv(shaderProgram.lightingDirectionUniform, adjustedLD);
+	  
+	  gl.uniform3f(
+        shaderProgram.directionalColorUniform,
+        parseFloat(document.getElementById("directionalR").value),
+        parseFloat(document.getElementById("directionalG").value),
+        parseFloat(document.getElementById("directionalB").value)
+      );
+	  
 	}
 
 	gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
@@ -387,6 +431,9 @@ function drawScene(){
 	gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertexTextureCoordBuffer);
     gl.vertexAttribPointer(shaderProgram.textureCoordAttribute, cubeVertexTextureCoordBuffer.itemSize, gl.FLOAT, false, 0, 0);
 	
+	gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertexNormalBuffer);
+    gl.vertexAttribPointer(shaderProgram.vertexNormalAttribute, cubeVertexNormalBuffer.itemSize, gl.FLOAT, false, 0, 0);
+	
 	gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, neheTextures[filter]);
     gl.uniform1i(shaderProgram.samplerUniform, 0);
@@ -394,9 +441,6 @@ function drawScene(){
 	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeVertexIndexBuffer);
     setMatrixUniforms();
 	gl.drawElements(gl.TRIANGLES, cubeVertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
-	
-	gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertexNormalBuffer);
-    gl.vertexAttribPointer(shaderProgram.vertexNormalAttribute, cubeVertexNormalBuffer.itemSize, gl.FLOAT, false, 0, 0);
 	
 	mvPopMatrix();
 }
@@ -503,6 +547,26 @@ function handleKeys() {
 
 <canvas id="my_webgl_canvas" width="500" height="500"></canvas>
 <input type="checkbox" id="lighting" checked /> Use lighting<br/>
+
+
+    <br/>
+    <h2>Directional light:</h2>
+
+    <table style="border: 0; padding: 10px;">
+        <tr>
+            <td><b>Direction:</b>
+            <td>X: <input type="text" id="lightDirectionX" value="-0.25" />
+            <td>Y: <input type="text" id="lightDirectionY" value="-0.25" />
+            <td>Z: <input type="text" id="lightDirectionZ" value="-1.0" />
+        </tr>
+        <tr>
+            <td><b>Colour:</b>
+            <td>R: <input type="text" id="directionalR" value="0.8" />
+            <td>G: <input type="text" id="directionalG" value="0.8" />
+            <td>B: <input type="text" id="directionalB" value="0.8" />
+        </tr>
+    </table>
+
 
 <h2>Ambient light:</h2>
     <table style="border: 0; padding: 10px;">
