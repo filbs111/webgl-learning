@@ -177,7 +177,9 @@
 		gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, texture.image);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
+		gl.generateMipmap(gl.TEXTURE_2D);
+		
 		gl.bindTexture(gl.TEXTURE_2D, null);
 	}
 	var texture;
@@ -204,7 +206,7 @@
         mat4.translate(mvMatrix, [0.0, 0.0, -7.0]);
 		
 		//rotate by some amount related to current time.
-		mat4.rotateZ(mvMatrix, frameTime/1000);
+		mat4.rotateZ(mvMatrix, frameTime/10000);
 		
         gl.bindBuffer(gl.ARRAY_BUFFER, squareVertexPositionBuffer);
         gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, squareVertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
