@@ -9,21 +9,28 @@
 	<!-- simple white colour pix shader -->
 	<script id="shader-fs" type="x-shader/x-fragment">
 		precision mediump float;
+		
+		varying vec2 vTextureCoord;
+		uniform sampler2D uSampler;
 
 		void main(void) {
-			gl_FragColor = vec4(1.0, 0.5, 1.0, 1.0);
+			gl_FragColor = texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));
 		}
 	</script>
 
 	<!-- vertex shader -->
 	<script id="shader-vs" type="x-shader/x-vertex">
 		attribute vec3 aVertexPosition;
+		attribute vec2 aTextureCoord;
 
 		uniform mat4 uMVMatrix;
 		uniform mat4 uPMatrix;
+		
+		varying vec2 vTextureCoord;
 
 		void main(void) {
 			gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
+			vTextureCoord = aTextureCoord;
 		}
 	</script>
 	
@@ -118,9 +125,13 @@
         shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
         gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
 
+		shaderProgram.textureCoordAttribute = gl.getAttribLocation(shaderProgram, "aTextureCoord");
+        gl.enableVertexAttribArray(shaderProgram.textureCoordAttribute);
+		
 		//maybe don't need all these uniforms for 2d / ortho projection...
         shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
         shaderProgram.mvMatrixUniform = gl.getUniformLocation(shaderProgram, "uMVMatrix");
+		shaderProgram.samplerUniform = gl.getUniformLocation(shaderProgram, "uSampler");
     }
 	
 	var mvMatrix = mat4.create();
@@ -131,7 +142,8 @@
         gl.uniformMatrix4fv(shaderProgram.mvMatrixUniform, false, mvMatrix);
     }
 
-	var squareVertexPositionBuffer;
+	var squareVertexPositionBuffer, 
+		squareVertexTextureCoordBuffer;
 
     function initBuffers() {
         squareVertexPositionBuffer = gl.createBuffer();
@@ -145,7 +157,38 @@
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
         squareVertexPositionBuffer.itemSize = 3;
         squareVertexPositionBuffer.numItems = 4;
+		
+		squareVertexTextureCoordBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, squareVertexTextureCoordBuffer);
+        var textureCoords = [
+			1.0, 1.0,
+            0.0, 1.0,
+            1.0, 0.0,
+            0.0, 0.0,
+        ];
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoords), gl.STATIC_DRAW);
+        squareVertexTextureCoordBuffer.itemSize = 2;
+        squareVertexTextureCoordBuffer.numItems = 4;
     }
+	
+	
+	function handleLoadedTexture(texture) {
+		gl.bindTexture(gl.TEXTURE_2D, texture);
+		gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, texture.image);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+		gl.bindTexture(gl.TEXTURE_2D, null);
+	}
+	var texture;
+	function initTexture() {
+		texture = gl.createTexture();
+		texture.image = new Image();
+		texture.image.onload = function() {
+		  handleLoadedTexture(texture)
+		}
+		texture.image.src = "img/lena.png";
+	}
 	
 	function setupScene() {
 		gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
@@ -165,6 +208,14 @@
 		
         gl.bindBuffer(gl.ARRAY_BUFFER, squareVertexPositionBuffer);
         gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, squareVertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+		
+		gl.bindBuffer(gl.ARRAY_BUFFER, squareVertexTextureCoordBuffer);
+        gl.vertexAttribPointer(shaderProgram.textureCoordAttribute, squareVertexTextureCoordBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.uniform1i(shaderProgram.samplerUniform, 0);
+		
         setMatrixUniforms();
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, squareVertexPositionBuffer.numItems);
     }
@@ -174,6 +225,7 @@
 		initGL(document.getElementById("mycanvas"));	//get ctx, set size
 		initShaders();
 		initBuffers();
+		initTexture();
 		gl.clearColor(0.0, 0.0, 0.0, 1.0);
         gl.enable(gl.DEPTH_TEST);
 		setupScene();
