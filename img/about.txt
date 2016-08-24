@@ -1,0 +1,6 @@
+
+E:\Code\webgl-learning\img>convert lena.png -morphology convolve "3x3: 0.0,0.0,0.0 0.0,1.0,0.0 0.0,0.0,0.0" lena_spread1.png
+
+E:\Code\webgl-learning\img>convert lena.png -morphology convolve "3x3: 0.0,0.2,0.0 0.2,0.2,0.2 0.0,0.2,0.0" lena_spread2.png
+
+E:\Code\webgl-learning\img>convert lena.png -morphology convolve "3x3: 0.11,0.11,0.11 0.11,0.11,0.11 0.11,0.11,0.11" lena_spread3.png
